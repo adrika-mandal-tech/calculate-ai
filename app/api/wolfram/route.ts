@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const WOLFRAM_API_KEY = process.env.WOLFRAM_API_KEY || '5HR4VWP22R'
-
 export async function POST(request: NextRequest) {
   try {
+    const WOLFRAM_API_KEY = process.env.WOLFRAM_API_KEY
+
+    if (!WOLFRAM_API_KEY) {
+      return NextResponse.json(
+        { error: "Missing WOLFRAM_API_KEY" },
+        { status: 500 }
+      )
+    }
+
     const { query } = await request.json()
 
     if (!query) {
@@ -11,38 +18,44 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Wolfram API Query:', query)
-    console.log('API Key:', WOLFRAM_API_KEY)
 
-    // Call Wolfram Alpha Full Results API with additional parameters
     const wolframUrl = `https://api.wolframalpha.com/v2/query?input=${encodeURIComponent(query)}&output=JSON&appid=${WOLFRAM_API_KEY}&format=plaintext,image&podtitle=true&scantimeout=5&reinterpret=true&assumption=*C.*-.*CalculatorFunction-&excludepopupid=Result&includepodid=Result&includepodid=StepByStepSolution&includepodid=Input&includepodid=IndefiniteIntegral&includepodid=Derivative&includepodid=Limit&includepodid=SeriesExpansion&includepodid=DecimalApproximation`
 
     console.log('Wolfram URL:', wolframUrl)
 
     const response = await fetch(wolframUrl)
+
+    if (!response.ok) {
+      throw new Error(`Wolfram API failed with status ${response.status}`)
+    }
+
     const data = await response.json()
 
     console.log('Wolfram Response:', JSON.stringify(data, null, 2))
 
     if (data.queryresult?.error) {
       console.error('Wolfram API Error:', data.queryresult.error)
-      return NextResponse.json({ error: 'Wolfram API error', details: data.queryresult.error }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Wolfram API error', details: data.queryresult.error },
+        { status: 500 }
+      )
     }
 
     if (!data.queryresult?.success) {
       console.error('Wolfram API No Success:', data.queryresult)
-      return NextResponse.json({ error: 'No results found', details: data.queryresult }, { status: 404 })
+      return NextResponse.json(
+        { error: 'No results found', details: data.queryresult },
+        { status: 404 }
+      )
     }
 
-    // Parse the pods and extract enhanced information
     const pods = data.queryresult.pods || []
     console.log('Number of pods:', pods.length)
 
-    // Find the main result and step-by-step solution
     let mainResult = ''
     let stepByStepSteps: string[] = []
     let confidence = 0.95
 
-    // Determine the operation type from the query
     const isDerivative = query.toLowerCase().includes('derivative') || query.toLowerCase().includes('differentiate') || query.toLowerCase().includes('d/dx')
     const isIntegral = query.toLowerCase().includes('integral') || query.toLowerCase().includes('integrate') || query.toLowerCase().includes('∫')
     const isLimit = query.toLowerCase().includes('limit') || query.toLowerCase().includes('lim')
@@ -52,7 +65,6 @@ export async function POST(request: NextRequest) {
     const isMatrix = query.toLowerCase().includes('matrix') || query.toLowerCase().includes('determinant') || query.toLowerCase().includes('inverse')
     const isPlot = query.toLowerCase().includes('plot') || query.toLowerCase().includes('graph')
 
-    // Set initial method based on query analysis
     let method = 'Mathematical Analysis'
     if (isDerivative) method = 'Differentiation'
     else if (isIntegral) method = 'Integration'
@@ -76,11 +88,9 @@ export async function POST(request: NextRequest) {
         })) || []
       }
 
-      // Extract main result based on operation type
       if (pod.id === 'Result' && pod.subpods?.[0]?.plaintext) {
         mainResult = pod.subpods[0].plaintext
       } else if (pod.id === 'Input' && pod.subpods?.[0]?.plaintext && !mainResult) {
-        // Only use Input pod if no result found yet
         mainResult = pod.subpods[0].plaintext
       } else if (pod.id === 'Derivative' && pod.subpods?.[0]?.plaintext && isDerivative) {
         mainResult = pod.subpods[0].plaintext
@@ -92,7 +102,6 @@ export async function POST(request: NextRequest) {
         mainResult = pod.subpods[0].plaintext
       }
 
-      // Extract step-by-step solution
       if (pod.id === 'StepByStepSolution' && pod.subpods?.[0]?.plaintext) {
         const stepsText = pod.subpods[0].plaintext
         stepByStepSteps = stepsText.split('\n').filter((step: string) => step.trim())
@@ -101,7 +110,6 @@ export async function POST(request: NextRequest) {
       return podData
     })
 
-    // If no step-by-step found, create basic steps from available information
     if (stepByStepSteps.length === 0 && mainResult) {
       stepByStepSteps = [
         `1. Input: ${query}`,
@@ -115,12 +123,16 @@ export async function POST(request: NextRequest) {
     console.log('Steps:', stepByStepSteps)
     console.log('Method:', method)
 
-    // If no pods, try a simpler query
     if (parsedPods.length === 0) {
       console.log('No pods found, trying fallback...')
       const fallbackUrl = `https://api.wolframalpha.com/v2/query?input=${encodeURIComponent(query)}&output=JSON&appid=${WOLFRAM_API_KEY}&format=plaintext&podtitle=true&scantimeout=10`
       
       const fallbackResponse = await fetch(fallbackUrl)
+
+      if (!fallbackResponse.ok) {
+        throw new Error(`Fallback API failed: ${fallbackResponse.status}`)
+      }
+
       const fallbackData = await fallbackResponse.json()
       
       console.log('Fallback Response:', JSON.stringify(fallbackData, null, 2))
