@@ -1,0 +1,601 @@
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { History, Calculator, Sigma, BarChart3, Code, Zap, Database, Cpu, Grid3x3, TrendingUp, Braces, RotateCcw, RotateCw } from "lucide-react"
+import { mathEngine } from "@/lib/math-engine"
+import { useHistoryStore } from "@/store/history-store"
+import { InlineMath } from "react-katex"
+import "katex/dist/katex.min.css"
+
+interface CalculatorInterfaceProps {
+  onHistoryClick: () => void
+  initialExpression?: string
+  onExpressionSelected?: () => void
+}
+
+export function CalculatorInterface({ 
+  onHistoryClick, 
+  initialExpression = "", 
+  onExpressionSelected 
+}: CalculatorInterfaceProps) {
+  const [display, setDisplay] = useState("0")
+  const [expression, setExpression] = useState("")
+  const [error, setError] = useState("")
+  const [angleMode, setAngleMode] = useState<"deg" | "rad" | "grad">("deg")
+  const [numberSystem, setNumberSystem] = useState<"dec" | "bin" | "hex" | "oct">("dec")
+  const [activeTab, setActiveTab] = useState("basic")
+  const [memory, setMemory] = useState<number>(0)
+  const [variables, setVariables] = useState<Record<string, number>>({})
+  const [history, setHistory] = useState<string[]>([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  const displayRef = useRef<HTMLDivElement>(null)
+  const { addEntry } = useHistoryStore()
+
+  useEffect(() => {
+    if (initialExpression) {
+      setExpression(initialExpression)
+      setDisplay(initialExpression)
+      onExpressionSelected?.()
+    }
+  }, [initialExpression, onExpressionSelected])
+
+  useEffect(() => {
+    mathEngine.setAngleMode(angleMode as 'deg' | 'rad')
+  }, [angleMode])
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key >= "0" && e.key <= "9") {
+        handleInput(e.key)
+      } else if (e.key === ".") {
+        handleInput(".")
+      } else if (e.key === "+" || e.key === "-" || e.key === "*" || e.key === "/") {
+        handleInput(e.key)
+      } else if (e.key === "(" || e.key === ")") {
+        handleInput(e.key)
+      } else if (e.key === "Enter" || e.key === "=") {
+        handleEquals()
+      } else if (e.key === "Escape" || e.key === "c" || e.key === "C") {
+        handleClear()
+      } else if (e.key === "Backspace") {
+        handleBackspace()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyPress)
+    return () => window.removeEventListener("keydown", handleKeyPress)
+  }, [expression, display])
+
+  const handleInput = (value: string) => {
+    setError("")
+    
+    // Save current state to history before making changes
+    const newExpression = display === "0" && value !== "." ? value : display + value
+    const newDisplay = newExpression
+    
+    // Update history
+    const newHistory = history.slice(0, historyIndex + 1)
+    newHistory.push(newExpression)
+    setHistory(newHistory)
+    setHistoryIndex(newHistory.length - 1)
+    
+    if (display === "0" && value !== ".") {
+      setDisplay(value)
+      setExpression(value)
+    } else {
+      setDisplay(display + value)
+      setExpression(expression + value)
+    }
+  }
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      const previousExpression = history[newIndex]
+      setDisplay(previousExpression)
+      setExpression(previousExpression)
+      setError("")
+    }
+  }
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
+      const nextExpression = history[newIndex]
+      setDisplay(nextExpression)
+      setExpression(nextExpression)
+      setError("")
+    }
+  }
+
+  const handleClear = () => {
+    setDisplay("0")
+    setExpression("")
+    setError("")
+  }
+
+  const handleBackspace = () => {
+    if (display.length > 1) {
+      setDisplay(display.slice(0, -1))
+      setExpression(expression.slice(0, -1))
+    } else {
+      setDisplay("0")
+      setExpression("")
+    }
+    setError("")
+  }
+
+  const validateExpression = (expr: string): boolean => {
+    if (!expr || expr.trim() === "") return false
+    
+    let parenCount = 0
+    for (const char of expr) {
+      if (char === '(') parenCount++
+      else if (char === ')') parenCount--
+      if (parenCount < 0) return false
+    }
+    if (parenCount !== 0) return false
+    
+    const validPattern = /^[0-9+\-*/().\s]+$/
+    if (!validPattern.test(expr)) return false
+    
+    return true
+  }
+
+  const handleEquals = () => {
+    if (!validateExpression(expression)) {
+      setError("Invalid mathematical expression")
+      return
+    }
+
+    try {
+      const result = mathEngine.calculate(expression)
+      if (result.error) {
+        setError("Invalid mathematical expression")
+        return
+      }
+      
+      const resultStr = String(result.result)
+      setDisplay(resultStr)
+      addEntry(expression, resultStr)
+      setExpression(resultStr)
+    } catch (err) {
+      setError("Invalid mathematical expression")
+    }
+  }
+
+  const handleFunction = (func: string) => {
+    handleInput(func + "(")
+  }
+
+  const handleConstant = (constant: string) => {
+    const constants: Record<string, number> = {
+      'pi': Math.PI,
+      'e': Math.E,
+      'phi': 1.618033988749895,
+      'c': 299792458,
+      'h': 6.62607015e-34,
+      'g': 9.80665,
+      'na': 6.02214076e23
+    }
+    handleInput(String(constants[constant] || constant))
+  }
+
+  const handleMemoryOperation = (operation: 'MC' | 'MR' | 'MS' | 'M+' | 'M-') => {
+    const currentValue = parseFloat(display)
+    switch (operation) {
+      case 'MC':
+        setMemory(0)
+        break
+      case 'MR':
+        setDisplay(String(memory))
+        setExpression(String(memory))
+        break
+      case 'MS':
+        setMemory(currentValue)
+        break
+      case 'M+':
+        setMemory(memory + currentValue)
+        break
+      case 'M-':
+        setMemory(memory - currentValue)
+        break
+    }
+  }
+
+  const handleNumberSystemConversion = (from: string, to: string) => {
+    try {
+      let decimal = 0
+      switch (from) {
+        case 'bin':
+          decimal = parseInt(display, 2)
+          break
+        case 'hex':
+          decimal = parseInt(display, 16)
+          break
+        case 'oct':
+          decimal = parseInt(display, 8)
+          break
+        default:
+          decimal = parseFloat(display)
+      }
+      
+      let result = ''
+      switch (to) {
+        case 'bin':
+          result = decimal.toString(2)
+          break
+        case 'hex':
+          result = decimal.toString(16).toUpperCase()
+          break
+        case 'oct':
+          result = decimal.toString(8)
+          break
+        default:
+          result = String(decimal)
+      }
+      
+      setDisplay(result)
+      setExpression(result)
+    } catch (err) {
+      setError("Conversion error")
+    }
+  }
+
+  const renderBasicButtons = () => (
+    <div className="space-y-2">
+      {[
+        ["C", "⌫", "%", "÷"],
+        ["7", "8", "9", "×"],
+        ["4", "5", "6", "-"],
+        ["1", "2", "3", "+"],
+        ["0", ".", "=", ""]
+      ].map((row, i) => (
+        <div key={i} className="grid grid-cols-4 gap-2">
+          {row.map((btn) => (
+            <Button
+              key={btn}
+              variant={btn === "=" ? "default" : "outline"}
+              className="h-14 text-lg font-bold bg-black text-yellow-400 border-orange-600 hover:bg-orange-900 hover:text-yellow-300"
+              onClick={() => {
+                if (btn === "C") handleClear()
+                else if (btn === "⌫") handleBackspace()
+                else if (btn === "±") handleInput("-")
+                else if (btn === "%") handleInput("/100")
+                else if (btn === "÷") handleInput("/")
+                else if (btn === "×") handleInput("*")
+                else if (btn === "=") handleEquals()
+              key={btn}
+              variant="outline"
+              className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              onClick={() => {
+                if (btn === "x²") handleInput("^2")
+                else if (btn === "√") handleFunction("sqrt")
+                else if (btn === "x^y") handleInput("^")
+                else if (btn === "π") handleConstant("pi")
+                else if (btn === "e") handleConstant("e")
+                else if (btn === "!") handleFunction("factorial")
+                else if (btn === "abs") handleFunction("abs")
+                else if (btn === "floor") handleFunction("floor")
+                else if (btn === "ceil") handleFunction("ceil")
+                else if (btn === "mod") handleInput("%")
+                else handleFunction(btn)
+              }}
+            >
+              {btn}
+            </Button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderAlgebraButtons = () => (
+    <div className="space-y-2">
+      {[
+        ["solve", "expand", "factor", "simplify"],
+        ["derivative", "integral", "limit", "sum"],
+        ["x", "y", "z", "t"],
+        ["=", "≠", "<", ">"],
+        ["≤", "≥", "∈", "∉"]
+      ].map((row, i) => (
+        <div key={i} className="grid grid-cols-4 gap-2">
+          {row.map((btn) => (
+            <Button
+              key={btn}
+              variant="outline"
+              className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              onClick={() => handleInput(btn)}
+            >
+              {btn}
+            </Button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderMatrixButtons = () => (
+    <div className="space-y-2">
+      {[
+        ["[A]", "[B]", "det", "trace"],
+        ["transpose", "inverse", "rref", "eigen"],
+        ["+", "×", "adj", "cofactor"],
+        ["2×2", "3×3", "4×4", "identity"]
+      ].map((row, i) => (
+        <div key={i} className="grid grid-cols-4 gap-2">
+          {row.map((btn) => (
+            <Button
+              key={btn}
+              variant="outline"
+              className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              onClick={() => handleInput(btn)}
+            >
+              {btn}
+            </Button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderStatisticsButtons = () => (
+    <div className="space-y-2">
+      {[
+        ["mean", "median", "mode", "range"],
+        ["var", "stdev", "corr", "regress"],
+        ["nPr", "nCr", "!", "perm"],
+        ["normal", "binom", "poisson", "uniform"],
+        ["hist", "box", "scatter", "line"]
+      ].map((row, i) => (
+        <div key={i} className="grid grid-cols-4 gap-2">
+          {row.map((btn) => (
+            <Button
+              key={btn}
+              variant="outline"
+              className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              onClick={() => handleFunction(btn)}
+            >
+              {btn}
+            </Button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderNumberSystemButtons = () => (
+    <div className="space-y-2">
+      {[
+        ["DEC", "BIN", "HEX", "OCT"],
+        ["AND", "OR", "XOR", "NOT"],
+        ["<<", ">>", "<<<", ">>>"],
+        ["0", "1", "2", "3"],
+        ["4", "5", "6", "7"],
+        ["8", "9", "A", "B"],
+        ["C", "D", "E", "F"]
+      ].map((row, i) => (
+        <div key={i} className="grid grid-cols-4 gap-2">
+          {row.map((btn) => (
+            <Button
+              key={btn}
+              variant="outline"
+              className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              onClick={() => {
+                if (["DEC", "BIN", "HEX", "OCT"].includes(btn)) {
+                  setNumberSystem(btn.toLowerCase() as any)
+                } else if (["AND", "OR", "XOR", "NOT"].includes(btn)) {
+                  handleInput(btn.toLowerCase())
+                } else {
+                  handleInput(btn)
+                }
+              }}
+            >
+              {btn}
+            </Button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderProgrammingButtons = () => (
+    <div className="space-y-2">
+      {[
+        ["if", "else", "for", "while"],
+        ["func", "return", "var", "const"],
+        ["print", "input", "read", "write"],
+        ["array", "list", "dict", "set"],
+        ["true", "false", "null", "undef"]
+      ].map((row, i) => (
+        <div key={i} className="grid grid-cols-4 gap-2">
+          {row.map((btn) => (
+            <Button
+              key={btn}
+              variant="outline"
+              className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              onClick={() => handleInput(btn)}
+            >
+              {btn}
+            </Button>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderConstantsButtons = () => (
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        <Button variant="outline" className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900" onClick={() => handleConstant("pi")}>
+          π ≈ 3.14159
+        </Button>
+        <Button variant="outline" className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900" onClick={() => handleConstant("e")}>
+          e ≈ 2.71828
+        </Button>
+        <Button variant="outline" className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900" onClick={() => handleConstant("phi")}>
+          φ ≈ 1.61803
+        </Button>
+        <Button variant="outline" className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900" onClick={() => handleConstant("c")}>
+          c = 299,792,458 m/s
+        </Button>
+        <Button variant="outline" className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900" onClick={() => handleConstant("h")}>
+          h = 6.626×10⁻³⁴ J⋅s
+        </Button>
+        <Button variant="outline" className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900" onClick={() => handleConstant("g")}>
+          g = 9.80665 m/s²
+        </Button>
+        <Button variant="outline" className="h-12 text-sm bg-black text-yellow-400 border-orange-600 hover:bg-orange-900" onClick={() => handleConstant("na")}>
+          Nₐ = 6.022×10²³
+        </Button>
+      </div>
+    </div>
+  )
+
+  const tabs = [
+    { id: "basic", label: "Basic", icon: Calculator, content: renderBasicButtons },
+    { id: "scientific", label: "Scientific", icon: Zap, content: renderScientificButtons },
+    { id: "algebra", label: "Algebra", icon: Sigma, content: renderAlgebraButtons },
+    { id: "matrix", label: "Matrix", icon: Grid3x3, content: renderMatrixButtons },
+    { id: "statistics", label: "Statistics", icon: BarChart3, content: renderStatisticsButtons },
+    { id: "numbers", label: "Number Systems", icon: Code, content: renderNumberSystemButtons },
+    { id: "programming", label: "Programming", icon: Cpu, content: renderProgrammingButtons },
+    { id: "constants", label: "Constants", icon: Database, content: renderConstantsButtons }
+  ]
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-black via-orange-950 to-black p-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 bg-black/50 backdrop-blur-sm rounded-lg p-4 border border-orange-600">
+          <h1 className="text-4xl font-bold text-orange-500 flex items-center gap-3">
+            <Calculator className="h-10 w-10" />
+            Math.Adv
+          </h1>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              onClick={() => setAngleMode(angleMode === "deg" ? "rad" : angleMode === "rad" ? "grad" : "deg")}
+            >
+              {angleMode.toUpperCase()}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              onClick={() => setNumberSystem(numberSystem === "dec" ? "bin" : numberSystem === "bin" ? "hex" : numberSystem === "hex" ? "oct" : "dec")}
+            >
+              {numberSystem.toUpperCase()}
+            </Button>
+            <Button variant="outline" size="sm" className="bg-black text-yellow-400 border-orange-600 hover:bg-orange-900" onClick={onHistoryClick}>
+              <History className="h-4 w-4 mr-2" />
+              History
+            </Button>
+          </div>
+        </div>
+
+        {/* Main Display */}
+        <Card className="shadow-2xl border-2 border-orange-600 bg-black/90 backdrop-blur-sm mb-6">
+          <CardContent className="p-6">
+            {/* Undo/Redo Buttons */}
+            <div className="flex justify-center gap-2 mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUndo}
+                disabled={historyIndex <= 0}
+                className="bg-orange-900 text-yellow-400 border-orange-600 hover:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Undo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRedo}
+                disabled={historyIndex >= history.length - 1}
+                className="bg-orange-900 text-yellow-400 border-orange-600 hover:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCw className="h-4 w-4 mr-1" />
+                Redo
+              </Button>
+            </div>
+            
+            <div className="mb-4">
+              <div 
+                ref={displayRef}
+                className="bg-black border-2 border-orange-600 text-yellow-400 p-6 rounded-lg text-right font-mono text-4xl min-h-[80px] flex items-center justify-end overflow-x-auto"
+              >
+                {error ? (
+                  <span className="text-red-500 text-2xl">{error}</span>
+                ) : (
+                  <InlineMath math={display || "0"} />
+                )}
+              </div>
+              <div className="mt-2 text-right text-yellow-600 font-mono text-sm">
+                {expression && expression !== display && <InlineMath math={expression} />}
+              </div>
+            </div>
+
+            {/* Memory Display */}
+            <div className="flex justify-between items-center mb-4 text-yellow-600 text-sm">
+              <span>M: {memory}</span>
+              <div className="flex gap-2">
+                {Object.entries(variables).map(([key, value]) => (
+                  <span key={key}>{key}: {value}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Memory Buttons */}
+            <div className="grid grid-cols-5 gap-2 mb-4">
+              {["MC", "MR", "MS", "M+", "M-"].map((btn) => (
+                <Button
+                  key={btn}
+                  variant="outline"
+                  size="sm"
+                  className="bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+                  onClick={() => handleMemoryOperation(btn as any)}
+                >
+                  {btn}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-4 overflow-x-auto">
+          {tabs.map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? "default" : "outline"}
+              className={`flex items-center gap-2 whitespace-nowrap ${
+                activeTab === tab.id 
+                  ? "bg-orange-600 text-black" 
+                  : "bg-black text-yellow-400 border-orange-600 hover:bg-orange-900"
+              }`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <Card className="shadow-2xl border-2 border-orange-600 bg-black/90 backdrop-blur-sm">
+          <CardContent className="p-6">
+            {tabs.find(tab => tab.id === activeTab)?.content()}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}

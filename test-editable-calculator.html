@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editable Calculator Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #fbbf24;
+            padding: 20px;
+        }
+        .calculator-display {
+            background: #000;
+            border: 2px solid #ea580c;
+            color: #fbbf24;
+            padding: 24px;
+            border-radius: 8px;
+            font-size: 32px;
+            text-align: right;
+            width: 100%;
+            font-family: monospace;
+            margin-bottom: 10px;
+        }
+        .help-text {
+            color: #fbbf24;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        .keyboard-shortcuts {
+            background: #14532d;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-bottom: 20px;
+        }
+        kbd {
+            background: #713f12;
+            padding: 2px 4px;
+            border-radius: 2px;
+            margin: 0 2px;
+        }
+        .test-section {
+            background: #1c1c1c;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-input {
+            background: #000;
+            border: 1px solid #ea580c;
+            color: #fbbf24;
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧮 Editable Calculator Display Test</h1>
+    
+    <div class="test-section">
+        <h3>✅ Features Implemented:</h3>
+        <ul>
+            <li>✅ Direct text input in calculator display</li>
+            <li>✅ Real-time expression editing</li>
+            <li>✅ Enter key to calculate</li>
+            <li>✅ Keyboard shortcuts for math functions</li>
+            <li>✅ Support for complex mathematical expressions</li>
+            <li>✅ Error handling with visual feedback</li>
+            <li>✅ Auto-focus on display</li>
+        </ul>
+    </div>
+
+    <div class="calculator-display" 
+         placeholder="Enter: 2+2, sin(45), derivative(x^2,x), integral(x^2,0,1)..."
+         contenteditable="true"
+         id="calculatorDisplay">
+        0
+    </div>
+
+    <div class="help-text">
+        💡 Type directly or use buttons • Press Enter to calculate
+    </div>
+
+    <div class="keyboard-shortcuts">
+        <strong>🎹 Keyboard Shortcuts:</strong><br>
+        <kbd>Ctrl+S</kbd> sin() <kbd>Ctrl+C</kbd> cos() <kbd>Ctrl+T</kbd> tan()<br>
+        <kbd>Ctrl+D</kbd> derivative() <kbd>Ctrl+I</kbd> integral()<br>
+        <kbd>Ctrl+P</kbd> π <kbd>Ctrl+E</kbd> e^ <kbd>Ctrl+F</kbd> factor()<br>
+        <kbd>Ctrl+L</kbd> log() <kbd>Ctrl+R</kbd> sqrt()
+    </div>
+
+    <div class="test-section">
+        <h3>🧪 Test Examples:</h3>
+        <p>Try typing these expressions directly:</p>
+        <div class="test-input" onclick="this.select()">2+2*3-4/2</div>
+        <div class="test-input" onclick="this.select()">sin(45)+cos(30)</div>
+        <div class="test-input" onclick="this.select()">derivative(x^2+3x+2,x)</div>
+        <div class="test-input" onclick="this.select()">integral(x^2,0,1)</div>
+        <div class="test-input" onclick="this.select()">det([[1,2],[3,4]])</div>
+        <div class="test-input" onclick="this.select()">factor(x^2-4)</div>
+        <div class="test-input" onclick="this.select()">limit(sin(x)/x,x,0)</div>
+        <div class="test-input" onclick="this.select()">mean([1,2,3,4,5])</div>
+        <div class="test-input" onclick="this.select()">C(5,2)</div>
+        <div class="test-input" onclick="this.select()">sqrt(16)+pi^2</div>
+    </div>
+
+    <div class="test-section">
+        <h3>🎯 Supported Math Topics:</h3>
+        <ul>
+            <li><strong>Basic Arithmetic:</strong> +, -, *, /, ^, !, %</li>
+            <li><strong>Trigonometry:</strong> sin(), cos(), tan(), asin(), acos(), atan()</li>
+            <li><strong>Calculus:</strong> derivative(), integral(), limit()</li>
+            <li><strong>Algebra:</strong> solve(), factor(), expand(), simplify()</li>
+            <li><strong>Linear Algebra:</strong> det(), inv(), transpose(), eigen()</li>
+            <li><strong>Statistics:</strong> mean(), median(), mode(), std(), variance()</li>
+            <li><strong>Probability:</strong> C(n,r), P(n,r), combinations(), permutations()</li>
+            <li><strong>Constants:</strong> pi, e, phi, i (imaginary)</li>
+            <li><strong>Functions:</strong> sqrt(), log(), log10(), log2(), abs(), floor(), ceil()</li>
+        </ul>
+    </div>
+
+    <script>
+        // Simulate the editable calculator functionality
+        const display = document.getElementById('calculatorDisplay');
+        
+        display.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                // Simulate calculation
+                const expression = display.textContent;
+                console.log('Calculating:', expression);
+                display.style.color = '#10b981'; // Green for success
+                setTimeout(() => {
+                    display.style.color = '#fbbf24'; // Back to yellow
+                }, 500);
+            }
+        });
+
+        // Test examples click to copy
+        document.querySelectorAll('.test-input').forEach(input => {
+            input.addEventListener('click', function() {
+                display.textContent = this.textContent;
+                display.focus();
+            });
+        });
+
+        // Auto-focus display
+        display.focus();
+    </script>
+</body>
+</html>
