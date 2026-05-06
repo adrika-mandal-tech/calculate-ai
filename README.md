@@ -1,4 +1,4 @@
-# AdvMATH.ai - Problem Solver
+# AdvMATH.ai - Math Problem Solver
 
 A comprehensive AI-powered web platform that solves engineering problem with step-by-step solutions, automatic visualization, and multi-method validation. Combines the reliability of Casio ClassWiz, intelligence of Mathway, and precision of MATLAB.
 
